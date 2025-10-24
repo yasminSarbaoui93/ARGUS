@@ -396,27 +396,38 @@ async def process_file(request: Request, background_tasks: BackgroundTasks):
 
 
 async def get_openai_settings():
-    """Get current OpenAI configuration from environment variables (read-only)"""
+    """Get current AI configuration from environment variables (read-only)"""
     try:
         # Return current environment variable values (for display purposes only)
         return {
+            "provider": os.getenv("AI_PROVIDER", "Azure OpenAI"),
             "openai_endpoint": os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-            "openai_key": "***HIDDEN***" if os.getenv("AZURE_OPENAI_KEY") else "",
+            "openai_key": "***hidden***" if os.getenv("AZURE_OPENAI_KEY") else "",
             "deployment_name": os.getenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", ""),
+            "mistral_endpoint": os.getenv("MISTRAL_ENDPOINT", ""),
+            "mistral_key": "***hidden***" if os.getenv("MISTRAL_API_KEY") else "",
+            "mistral_model": os.getenv("MISTRAL_MODEL", ""),
+            "eval_endpoint": os.getenv("EVAL_OPENAI_ENDPOINT", ""),
+            "eval_key": "***hidden***" if os.getenv("EVAL_OPENAI_KEY") else "",
+            "eval_deployment": os.getenv("EVAL_OPENAI_DEPLOYMENT", ""),
             "note": "Configuration is read from environment variables only. Update via deployment/infrastructure."
         }
         
     except Exception as e:
-        logger.error(f"Error fetching OpenAI settings: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch OpenAI settings")
+        logger.error(f"Error fetching AI settings: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch AI settings")
 
 
 async def update_openai_settings(request: Request):
-    """Update OpenAI settings by modifying environment variables"""
+    """Update AI settings by modifying environment variables"""
     try:
         data = await request.json()
         
-        # Update environment variables
+        # Update provider selection
+        if "provider" in data:
+            os.environ["AI_PROVIDER"] = data["provider"]
+        
+        # Update Azure OpenAI environment variables
         if "openai_endpoint" in data:
             os.environ["AZURE_OPENAI_ENDPOINT"] = data["openai_endpoint"]
         if "openai_key" in data:
@@ -424,18 +435,41 @@ async def update_openai_settings(request: Request):
         if "openai_deployment_name" in data:
             os.environ["AZURE_OPENAI_MODEL_DEPLOYMENT_NAME"] = data["openai_deployment_name"]
         
-        # Return success response with updated config (hide key)
+        # Update Mistral Document AI environment variables
+        if "mistral_endpoint" in data:
+            os.environ["MISTRAL_ENDPOINT"] = data["mistral_endpoint"]
+        if "mistral_key" in data:
+            os.environ["MISTRAL_API_KEY"] = data["mistral_key"]
+        if "mistral_model" in data:
+            os.environ["MISTRAL_MODEL"] = data["mistral_model"]
+        
+        # Update evaluation OpenAI environment variables
+        if "eval_endpoint" in data:
+            os.environ["EVAL_OPENAI_ENDPOINT"] = data["eval_endpoint"]
+        if "eval_key" in data:
+            os.environ["EVAL_OPENAI_KEY"] = data["eval_key"]
+        if "eval_deployment" in data:
+            os.environ["EVAL_OPENAI_DEPLOYMENT"] = data["eval_deployment"]
+        
+        # Return success response with updated config (hide keys)
         updated_config = {
+            "provider": os.environ.get("AI_PROVIDER", "Azure OpenAI"),
             "openai_endpoint": os.environ.get("AZURE_OPENAI_ENDPOINT", ""),
             "openai_key": "***hidden***" if os.environ.get("AZURE_OPENAI_KEY") else "",
             "openai_deployment_name": os.environ.get("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", ""),
+            "mistral_endpoint": os.environ.get("MISTRAL_ENDPOINT", ""),
+            "mistral_key": "***hidden***" if os.environ.get("MISTRAL_API_KEY") else "",
+            "mistral_model": os.environ.get("MISTRAL_MODEL", ""),
+            "eval_endpoint": os.environ.get("EVAL_OPENAI_ENDPOINT", ""),
+            "eval_key": "***hidden***" if os.environ.get("EVAL_OPENAI_KEY") else "",
+            "eval_deployment": os.environ.get("EVAL_OPENAI_DEPLOYMENT", ""),
             "env_var_only": True
         }
         
         return {"message": "Environment variables updated successfully", "config": updated_config}
         
     except Exception as e:
-        logger.error(f"Error updating OpenAI settings: {e}")
+        logger.error(f"Error updating AI settings: {e}")
         raise HTTPException(status_code=400, detail=f"Error updating settings: {str(e)}")
 
 

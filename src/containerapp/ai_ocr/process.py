@@ -153,6 +153,7 @@ def safe_parse_json(content: str) -> dict:
         }
 
 from ai_ocr.azure.doc_intelligence import get_ocr_results
+from ai_ocr.azure.mistral_doc_ai import get_mistral_ocr_results
 from ai_ocr.azure.openai_ops import load_image, get_size_of_base64_images
 from ai_ocr.chains import get_structured_data, get_summary_with_gpt, perform_gpt_evaluation_and_enrichment
 from ai_ocr.model import Config
@@ -444,12 +445,43 @@ def convert_pdf_into_image(pdf_path):
 
 def run_ocr_processing(file_to_ocr: str, document: dict, container: any, conf_container: any = None, update_state: bool = True) -> tuple[str, float]:
     """
-    Run OCR processing on the input file.
+    Run OCR processing on the input file using either Azure Document Intelligence or Mistral Document AI.
     Returns OCR result and processing time.
     """
+    import os
+    
     ocr_start_time = datetime.now()
     try:
-        ocr_result = get_ocr_results(file_to_ocr, None)
+        # Check which provider to use
+        ai_provider = os.getenv("AI_PROVIDER", "Azure OpenAI")
+        
+        if ai_provider == "Mistral Document AI":
+            # Use Mistral Document AI for OCR
+            logging.info(f"Using Mistral Document AI for OCR processing")
+            
+            # Get the JSON schema from document if available for structured extraction
+            json_schema = document.get('model_input', {}).get('example_schema')
+            schema_dict = None
+            
+            # Try to parse JSON schema if it's a string
+            if isinstance(json_schema, str) and json_schema.strip():
+                try:
+                    schema_dict = json.loads(json_schema)
+                except:
+                    logging.warning("Could not parse JSON schema, proceeding without it")
+            elif isinstance(json_schema, dict):
+                schema_dict = json_schema
+            
+            ocr_result = get_mistral_ocr_results(
+                file_to_ocr, 
+                json_schema=schema_dict,
+                include_document_annotation=True
+            )
+        else:
+            # Use Azure Document Intelligence for OCR (default)
+            logging.info(f"Using Azure Document Intelligence for OCR processing")
+            ocr_result = get_ocr_results(file_to_ocr, None)
+        
         # Don't update document's ocr_output here for chunks - let caller handle merging
         ocr_processing_time = (datetime.now() - ocr_start_time).total_seconds()
         if update_state:
